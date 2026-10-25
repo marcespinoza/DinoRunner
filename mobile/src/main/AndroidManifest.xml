@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Opcional: soporte de gamepad. NUNCA required="true" -->
+    <uses-feature android:name="android.hardware.gamepad" android:required="false" />
+
+    <application
+        android:appCategory="game"
+        android:theme="@style/Theme.DinoRunner">
+
+    <activity
+        android:name=".DinoGameActivity"
+        android:exported="true"
+        android:label="Dino Runner"
+        android:screenOrientation="landscape"
+        android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density">
+        <!-- No fijar screenOrientation: la app debe soportar vertical y horizontal -->
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+            <!-- Declara soporte de Android Auto (puede ir en este mismo intent-filter) -->
+            <category android:name="android.intent.category.CAR_LAUNCHER" />
+        </intent-filter>
+        <!-- NO agregar <meta-data android:name="distractionOptimized" .../> -->
+    </activity>
+</application>
+
+</manifest>
