@@ -33,7 +33,7 @@ import kotlin.random.Random
 
 private sealed interface Screen {
     data object Start : Screen
-    data object Game : Screen
+    data class Game(val isTwoPlayers: Boolean) : Screen
 }
 
 class DinoGameActivity : ComponentActivity() {
@@ -72,13 +72,13 @@ fun DinoApp(paused: Boolean) {
             when (key) {
                 is Screen.Start -> NavEntry(key) {
                     StartScreen(
-                        onStartGame = {
-                            backStack.add(Screen.Game)
+                        onStartGame = { isTwoPlayers ->
+                            backStack.add(Screen.Game(isTwoPlayers))
                         }
                     )
                 }
                 is Screen.Game -> NavEntry(key) {
-                    MainScreen(paused = paused)
+                    MainScreen(paused = paused, isTwoPlayers = key.isTwoPlayers)
                 }
                 else -> error("Unknown route: $key")
             }

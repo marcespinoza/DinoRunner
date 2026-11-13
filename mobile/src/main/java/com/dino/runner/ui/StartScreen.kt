@@ -32,7 +32,7 @@ val PixelifyFont = FontFamily(
 )
 
 @Composable
-fun StartScreen(onStartGame: () -> Unit) {
+fun StartScreen(onStartGame: (isTwoPlayers: Boolean) -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -75,7 +75,7 @@ fun StartScreen(onStartGame: () -> Unit) {
                     fontSize = 42.sp,
                     fontFamily = PixelifyFont,
                     fontWeight = FontWeight.Medium,
-                    color = Color(0xFFFFB300),
+                    color = Color(0xFFFF5722),
                     textAlign = TextAlign.Center
                 )
             )
@@ -86,11 +86,11 @@ fun StartScreen(onStartGame: () -> Unit) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .clickable { onStartGame() }
+                    .clickable { onStartGame(false) }
                     .padding(8.dp)
             ) {
                 BasicText(
-                    text = "▶  1 PLAYER",
+                    text = "1 PLAYER",
                     style = TextStyle(
                         fontSize = 24.sp,
                         fontFamily = PixelifyFont,
@@ -106,14 +106,16 @@ fun StartScreen(onStartGame: () -> Unit) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
+                    .clickable { onStartGame(true) }
                     .padding(8.dp)
             ) {
                 BasicText(
-                    text = "    2 PLAYER",
+                    text = "2 PLAYERS",
                     style = TextStyle(
                         fontSize = 24.sp,
                         fontFamily = PixelifyFont,
-                        color = Color(0xFF7E758F)
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFFFFC107)
                     )
                 )
             }

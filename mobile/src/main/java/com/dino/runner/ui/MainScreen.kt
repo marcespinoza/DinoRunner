@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dino.runner.GameState
 import com.dino.runner.R
+import androidx.compose.ui.text.font.FontWeight
 import com.dino.runner.domain.Constants.CLOUD_W
 import com.dino.runner.domain.Constants.DINO_SIZE
 import com.dino.runner.domain.Constants.DINO_X
@@ -151,25 +154,48 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
         listOf(SharedPreferencesMigration(context, "dino_prefs"))
     }
 )
-private val HIGH_SCORE_KEY = intPreferencesKey("high_score")
+private val USER1_HIGH_SCORE_KEY = intPreferencesKey("user1_high_score")
+private val USER2_HIGH_SCORE_KEY = intPreferencesKey("user2_high_score")
+// Legacy key: all scores used to be stored under "0"; used as fallback for User 1.
+private val HIGH_SCORE_KEY = intPreferencesKey("0")
+
+private data class UserScore(val label: String, val score: Int, val userNumber: Int)
 
 @Composable
-fun MainScreen(paused: Boolean) {
+fun MainScreen(paused: Boolean, isTwoPlayers: Boolean = false) {
 val state = remember { GameState() }
 val context = LocalContext.current
 val coroutineScope = rememberCoroutineScope()
-val highScoreFlow = remember(context) {
+var currentPlayer by remember { mutableIntStateOf(1) }
+
+val user1HighScoreFlow = remember(context) {
     context.dataStore.data.map { preferences ->
-        preferences[HIGH_SCORE_KEY] ?: 0
+        preferences[USER1_HIGH_SCORE_KEY] ?: preferences[HIGH_SCORE_KEY] ?: 0
     }
 }
-val highScoreState = highScoreFlow.collectAsState(initial = 0)
-val highScore = highScoreState.value
+val user2HighScoreFlow = remember(context) {
+    context.dataStore.data.map { preferences ->
+        preferences[USER2_HIGH_SCORE_KEY] ?: 0
+    }
+}
+val user1HighScore by user1HighScoreFlow.collectAsState(initial = 0)
+val user2HighScore by user2HighScoreFlow.collectAsState(initial = 0)
+
 var tick by remember { mutableLongStateOf(0L) }
 var boxSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
 var aspect by remember { mutableFloatStateOf(16f / 9f) }
 var score by remember { mutableIntStateOf(0) }
 var gameOver by remember { mutableStateOf(false) }
+
+// The active player's ranking value follows the live score once it surpasses their record.
+val user1Display = if (currentPlayer == 1) maxOf(user1HighScore, score) else user1HighScore
+val user2Display = if (currentPlayer == 2) maxOf(user2HighScore, score) else user2HighScore
+val rankingList = remember(user1Display, user2Display) {
+    listOf(
+        UserScore("User 1", user1Display, 1),
+        UserScore("User 2", user2Display, 2)
+    ).sortedWith(compareByDescending<UserScore> { it.score }.thenBy { it.userNumber })
+}
 
 
 LaunchedEffect(paused) {
@@ -191,11 +217,20 @@ LaunchedEffect(paused) {
                 score = state.score.toInt()
                 if (!wasOver && state.over) {
                     val finalScore = state.score.toInt()
+                    val activePlayer = currentPlayer
                     coroutineScope.launch {
                         context.dataStore.edit { preferences ->
-                            val currentHigh = preferences[HIGH_SCORE_KEY] ?: 0
-                            if (finalScore > currentHigh) {
-                                preferences[HIGH_SCORE_KEY] = finalScore
+                            if (activePlayer == 1) {
+                                val currentHigh = preferences[USER1_HIGH_SCORE_KEY] ?: preferences[HIGH_SCORE_KEY] ?: 0
+                                if (finalScore > currentHigh) {
+                                    preferences[USER1_HIGH_SCORE_KEY] = finalScore
+                                    preferences[HIGH_SCORE_KEY] = finalScore
+                                }
+                            } else {
+                                val currentHigh = preferences[USER2_HIGH_SCORE_KEY] ?: 0
+                                if (finalScore > currentHigh) {
+                                    preferences[USER2_HIGH_SCORE_KEY] = finalScore
+                                }
                             }
                         }
                     }
@@ -239,7 +274,19 @@ LaunchedEffect(paused) {
         .fillMaxSize()
         .background(Color(0xFFF7F7F7))
         .safeDrawingPadding()
-        .pointerInput(Unit) { detectTapGestures { state.jump() } }
+        .pointerInput(isTwoPlayers) {
+            detectTapGestures {
+                if (state.over) {
+                    if (isTwoPlayers) {
+                        currentPlayer = if (currentPlayer == 1) 2 else 1
+                    }
+                    state.reset()
+                    score = 0
+                } else {
+                    state.jump()
+                }
+            }
+        }
         .onSizeChanged {
             boxSize = it
             if (it.height > 0) aspect = it.width.toFloat() / it.height
@@ -286,40 +333,114 @@ LaunchedEffect(paused) {
                 modifier = Modifier
                     .size(with(LocalDensity.current) { dinoSizePx.toDp() })
                     .graphicsLayer {
-                        tick // leer el estado acá para que se actualice en cada frame
+                        tick
                         translationX = DINO_X * u
                         translationY = groundY - (state.dinoY + DINO_SIZE) * u +feetGap
                     }
             )
         }
-        Row(
+        if (isTwoPlayers) Row(
             modifier = Modifier
                 .wrapContentHeight()
-                .align(Alignment.TopEnd),
+                .align(Alignment.TopStart),
             horizontalArrangement = Arrangement.End,
         ){
-            Text(
-                text = "High Score: $highScore",
-                style = TextStyle(fontSize = 20.sp, color = Color.DarkGray),
+            Column(
                 modifier = Modifier
-                    .padding(16.dp)
-            )
-            Text(
-                text =  score.toString(),
-                style = TextStyle(fontSize = 20.sp, color = Color.DarkGray),
+                    .wrapContentHeight()
+                    .padding(bottom = 6.dp, top = 10.dp, end = 10.dp, start = 10.dp)
+            ) {
+                Text(
+                    text = "Ranking",
+                    style = TextStyle(
+                        fontSize = 20.sp,
+                        color = Color.DarkGray,
+                        fontFamily = PixelifyFont
+                    ),
+                    modifier = Modifier
+                        .padding(bottom = 6.dp, end = 10.dp)
+                )
+                rankingList.forEach { userScore ->
+                    Row {
+                        Text(
+                            text = "${userScore.label}:",
+                            style = TextStyle(
+                                fontSize = 20.sp,
+                                color = Color.Green,
+                                fontFamily = PixelifyFont
+                            ),
+                            modifier = Modifier
+                                .padding(bottom = 6.dp, end = 15.dp)
+                        )
+                        Text(
+                            text = "${userScore.score}",
+                            style = TextStyle(
+                                fontSize = 20.sp,
+                                color = Color.Red,
+                                fontFamily = PixelifyFont
+                            ),
+                            modifier = Modifier
+                                .padding(bottom = 6.dp)
+                        )
+                    }
+                }
+            }
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+        ){
+            Row (
                 modifier = Modifier
-                    .padding(16.dp)
-                    .width(50.dp)
-            )
+                    .wrapContentHeight()
+            ){
+                Text(
+                    text =  "Score",
+                    style = TextStyle(
+                        fontSize = 20.sp,
+                        color = Color.DarkGray,
+                        fontFamily = PixelifyFont
+                    ),
+                    modifier = Modifier
+                        .padding(10.dp)
+                )
+                Text(
+                    text =  score.toString(),
+                    style = TextStyle(
+                        fontSize = 20.sp,
+                        color = Color.DarkGray,
+                        fontFamily = PixelifyFont
+                    ),
+                    modifier = Modifier
+                        .width(60.dp)
+                        .padding(10.dp)
+                )
+            }
         }
 
         if (gameOver) {
+            val gameOverMessage = if (isTwoPlayers) {
+                "Fin del juego (User $currentPlayer). Toca para turno de User ${if (currentPlayer == 1) 2 else 1}"
+            } else {
+                "Fin del juego. Toca para reintentar"
+            }
             BasicText(
-                text = "Fin del juego. Toca para reintentar",
-                style = TextStyle(fontSize = 22.sp, color = Color.DarkGray),
+                text = gameOverMessage,
+                style = TextStyle(
+                    fontSize = 22.sp,
+                    color = Color.DarkGray,
+                    fontFamily = PixelifyFont,
+                    fontWeight = FontWeight.Medium
+                ),
                 modifier = Modifier.align(Alignment.Center)
             )
         }
     }
 
+}
+
+@Preview(showBackground = true, widthDp = 640, heightDp = 360)
+@Composable
+private fun MainScreenPreview() {
+    MainScreen(paused = false)
 }

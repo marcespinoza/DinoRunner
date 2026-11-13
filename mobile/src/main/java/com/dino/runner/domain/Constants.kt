@@ -2,7 +2,7 @@ package com.dino.runner.domain
 
 object Constants {
     const val DINO_X = 0.15f
-    const val DINO_SIZE = 0.12f
+    const val DINO_SIZE = 0.15f
     const val GRAVITY = 4.5f
     const val JUMP_VELOCITY = 1.4f
     const val START_SPEED = 0.8f
