@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +41,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -49,6 +52,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -159,6 +165,9 @@ private val USER2_HIGH_SCORE_KEY = intPreferencesKey("user2_high_score")
 // Legacy key: all scores used to be stored under "0"; used as fallback for User 1.
 private val HIGH_SCORE_KEY = intPreferencesKey("0")
 
+private const val PREVIEW_USER1_SCORE = 1250
+private const val PREVIEW_USER2_SCORE = 980
+
 private data class UserScore(val label: String, val score: Int, val userNumber: Int)
 
 @Composable
@@ -178,8 +187,12 @@ val user2HighScoreFlow = remember(context) {
         preferences[USER2_HIGH_SCORE_KEY] ?: 0
     }
 }
-val user1HighScore by user1HighScoreFlow.collectAsState(initial = 0)
-val user2HighScore by user2HighScoreFlow.collectAsState(initial = 0)
+// In Android Studio previews DataStore isn't available, so show dummy scores instead.
+val isPreview = LocalInspectionMode.current
+val storedUser1HighScore by user1HighScoreFlow.collectAsState(initial = 0)
+val storedUser2HighScore by user2HighScoreFlow.collectAsState(initial = 0)
+val user1HighScore = if (isPreview) PREVIEW_USER1_SCORE else storedUser1HighScore
+val user2HighScore = if (isPreview) PREVIEW_USER2_SCORE else storedUser2HighScore
 
 var tick by remember { mutableLongStateOf(0L) }
 var boxSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
@@ -361,12 +374,24 @@ LaunchedEffect(paused) {
                         .padding(bottom = 6.dp, end = 10.dp)
                 )
                 rankingList.forEach { userScore ->
-                    Row {
+                    val isActive = userScore.userNumber == currentPlayer
+                    Row(
+                        modifier = Modifier.alpha(if (isActive) 1f else 0.4f)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.arrow_down),
+                            contentDescription = null,
+                            // Invisible but still takes space, so the names stay aligned
+                            modifier = Modifier
+                                .size(26.dp)
+                                .rotate(270f)
+                                .alpha(if (isActive) 1f else 0f)
+                        )
                         Text(
                             text = "${userScore.label}:",
                             style = TextStyle(
                                 fontSize = 20.sp,
-                                color = Color.Green,
+                                color = colorResource(R.color.green),
                                 fontFamily = PixelifyFont
                             ),
                             modifier = Modifier
@@ -442,5 +467,5 @@ LaunchedEffect(paused) {
 @Preview(showBackground = true, widthDp = 640, heightDp = 360)
 @Composable
 private fun MainScreenPreview() {
-    MainScreen(paused = false)
+    MainScreen(paused = false, isTwoPlayers = true)
 }
